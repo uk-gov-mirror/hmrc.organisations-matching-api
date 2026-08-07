@@ -3,7 +3,7 @@ import sbt.*
 object AppDependencies {
   val hmrc = "uk.gov.hmrc"
   val playVersion = "play-30"
-  val hmrcMongoVersion = "2.12.0"
+  val hmrcMongoVersion = "2.13.0"
   var bootstrapVersion = "10.7.0"
 
   val compile: Seq[ModuleID] = Seq(
@@ -11,7 +11,7 @@ object AppDependencies {
     hmrc           %% s"play-hmrc-api-$playVersion" % "8.3.0",
     hmrc           %% s"play-hal-$playVersion"      % "4.1.0",
     hmrc           %% s"crypto-json-$playVersion"   % "8.4.0",
-    hmrc           %% s"internal-auth-client-$playVersion" % "4.3.0"
+    hmrc           %% s"internal-auth-client-$playVersion" % "4.4.0"
   )
 
   def test(scope: String = "test, it, component"): Seq[ModuleID] = Seq(

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.organisationsmatchingapi.controllers
+package uk.gov.hmrc.organisationsmatchingapi.controllers.documentation
 
 import org.apache.pekko.stream.Materializer
 import controllers.Assets
