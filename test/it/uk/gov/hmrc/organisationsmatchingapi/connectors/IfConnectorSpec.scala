@@ -23,7 +23,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.mockito.MockitoSugar
 import org.scalatestplus.play.guice.GuiceOneAppPerSuite
-import play.api.Application
+import play.api.{Application, Configuration}
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.libs.json.Json
 import play.api.mvc.AnyContentAsEmpty
@@ -50,15 +50,21 @@ class IfConnectorSpec
     with MockitoSugar
     with Matchers
     with GuiceOneAppPerSuite {
-  val integrationFrameworkAuthorizationToken = "IF_TOKEN"
+  val corporationTaxAuthorizationToken = "IF_TOKEN_1707"
+  val selfAssessmentAuthorizationToken = "IF_TOKEN_1710"
+  val vatAuthorizationToken = "IF_TOKEN_VAT"
+  val existingCorporationTaxAuthorizationToken = "EXISTING_IF_TOKEN_CT"
+  val existingSelfAssessmentAuthorizationToken = "EXISTING_IF_TOKEN_SA"
   val integrationFrameworkEnvironment = "IF_ENVIRONMENT"
 
   override def fakeApplication(): Application = new GuiceApplicationBuilder()
     .configure(
       "microservice.services.integration-framework.port" -> wireMockPort,
-      "microservice.services.integration-framework.authorization-token.ct" -> integrationFrameworkAuthorizationToken,
-      "microservice.services.integration-framework.authorization-token.sa" -> integrationFrameworkAuthorizationToken,
-      "microservice.services.integration-framework.authorization-token.vat" -> integrationFrameworkAuthorizationToken,
+      "microservice.services.integration-framework.authorization-token.1707" -> corporationTaxAuthorizationToken,
+      "microservice.services.integration-framework.authorization-token.1710" -> selfAssessmentAuthorizationToken,
+      "microservice.services.integration-framework.authorization-token.ct" -> existingCorporationTaxAuthorizationToken,
+      "microservice.services.integration-framework.authorization-token.sa" -> existingSelfAssessmentAuthorizationToken,
+      "microservice.services.integration-framework.authorization-token.vat" -> vatAuthorizationToken,
       "microservice.services.integration-framework.environment" -> integrationFrameworkEnvironment
     )
     .build()
@@ -76,6 +82,20 @@ class IfConnectorSpec
     val auditHelper: AuditHelper = mock[AuditHelper]
 
     val underTest = new IfConnector(config, httpClient, auditHelper)
+
+    def connectorWithExistingTokens(ctToken: String, saToken: String): IfConnector = {
+      val fallbackConfig = new ServicesConfig(Configuration.from(Map(
+        "microservice.services.integration-framework.protocol" -> "http",
+        "microservice.services.integration-framework.host" -> "localhost",
+        "microservice.services.integration-framework.port" -> wireMockPort,
+        "microservice.services.integration-framework.environment" -> integrationFrameworkEnvironment,
+        "microservice.services.integration-framework.authorization-token.ct" -> ctToken,
+        "microservice.services.integration-framework.authorization-token.sa" -> saToken,
+        "microservice.services.integration-framework.authorization-token.vat" -> vatAuthorizationToken
+      )))
+
+      new IfConnector(fallbackConfig, httpClient, auditHelper)
+    }
   }
 
   "fetch Corporation Tax" should {
@@ -113,7 +133,7 @@ class IfConnectorSpec
 
       stubFor(
         get(urlPathMatching(s"/organisations/corporation-tax/$crn/company/details"))
-          .withHeader(HeaderNames.authorisation, equalTo(s"Bearer $integrationFrameworkAuthorizationToken"))
+          .withHeader(HeaderNames.authorisation, equalTo(s"Bearer $corporationTaxAuthorizationToken"))
           .withHeader("Environment", equalTo(integrationFrameworkEnvironment))
           .withHeader("CorrelationId", equalTo(sampleCorrelationId))
           .willReturn(
@@ -142,6 +162,30 @@ class IfConnectorSpec
         Some(registeredDetails),
         Some(communicationDetails)
       )
+    }
+
+    "fall back to the existing CT authorization token when the 1707 token is absent" in new Setup {
+      val connector = connectorWithExistingTokens(existingCorporationTaxAuthorizationToken, existingSelfAssessmentAuthorizationToken)
+      val response = IfCorpTaxCompanyDetails(Some(utr), Some(crn), None, None)
+
+      stubFor(
+        get(urlPathMatching(s"/organisations/corporation-tax/$crn/company/details"))
+          .withHeader(HeaderNames.authorisation, equalTo(s"Bearer $existingCorporationTaxAuthorizationToken"))
+          .willReturn(okJson(Json.stringify(Json.toJson(response)))))
+
+      await(connector.fetchCorporationTax(matchId, crn)) shouldBe response
+    }
+
+    "omit the authorization header when neither the 1707 nor existing CT token exists" in new Setup {
+      val connector = connectorWithExistingTokens("", existingSelfAssessmentAuthorizationToken)
+      val response = IfCorpTaxCompanyDetails(Some(utr), Some(crn), None, None)
+
+      stubFor(
+        get(urlPathMatching(s"/organisations/corporation-tax/$crn/company/details"))
+          .withHeader(HeaderNames.authorisation, absent())
+          .willReturn(okJson(Json.stringify(Json.toJson(response)))))
+
+      await(connector.fetchCorporationTax(matchId, crn)) shouldBe response
     }
 
     "Fail when IF returns an error" in new Setup {
@@ -215,7 +259,7 @@ class IfConnectorSpec
         get(urlPathMatching(s"/organisations/self-assessment/$utr/taxpayer/details"))
           .withHeader(
             HeaderNames.authorisation,
-            equalTo(s"Bearer $integrationFrameworkAuthorizationToken"))
+            equalTo(s"Bearer $selfAssessmentAuthorizationToken"))
           .withHeader("Environment", equalTo(integrationFrameworkEnvironment))
           .withHeader("CorrelationId", equalTo(sampleCorrelationId))
           .willReturn(aResponse()
@@ -238,6 +282,18 @@ class IfConnectorSpec
         Some("Individual"),
         Some(Seq(taxpayerJohnNameAddress, taxpayerJoanneNameAddress))
       )
+    }
+
+    "fall back to the existing SA authorization token when the 1710 token is absent" in new Setup {
+      val connector = connectorWithExistingTokens(existingCorporationTaxAuthorizationToken, existingSelfAssessmentAuthorizationToken)
+      val response = IfSaTaxpayerDetails(Some(utr), Some("Individual"), None)
+
+      stubFor(
+        get(urlPathMatching(s"/organisations/self-assessment/$utr/taxpayer/details"))
+          .withHeader(HeaderNames.authorisation, equalTo(s"Bearer $existingSelfAssessmentAuthorizationToken"))
+          .willReturn(okJson(Json.stringify(Json.toJson(response)))))
+
+      await(connector.fetchSelfAssessment(matchId, utr)) shouldBe response
     }
 
     "Fail when IF returns an error" in new Setup {
@@ -295,7 +351,7 @@ class IfConnectorSpec
         get(urlPathMatching(vatUrl))
           .withHeader(
             HeaderNames.authorisation,
-            equalTo(s"Bearer $integrationFrameworkAuthorizationToken"))
+            equalTo(s"Bearer $vatAuthorizationToken"))
           .withHeader("Environment", equalTo(integrationFrameworkEnvironment))
           .withHeader("CorrelationId", equalTo(sampleCorrelationId))
           .willReturn(aResponse()

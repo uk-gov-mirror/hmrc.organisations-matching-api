@@ -33,17 +33,26 @@ import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
 import javax.inject.Inject
 import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
+import scala.util.Try
 
 class IfConnector @Inject()(servicesConfig: ServicesConfig, http: HttpClientV2, auditHelper: AuditHelper)(implicit ec: ExecutionContext) extends Logging {
   private val baseUrl = servicesConfig.baseUrl("integration-framework")
 
   private object BearerTokens {
-    val sa: String = getIFToken("sa")
-    val ct: String = getIFToken("ct")
-    val vat: String = getIFToken("vat")
+    val sa: Option[String] = getAPIIFToken("1710").orElse(getIFToken("sa"))
+    val ct: Option[String] = getAPIIFToken("1707").orElse(getIFToken("ct"))
+    val vat: Option[String] = getOptionalToken(
+      "integration-framework.authorization-token.vat"
+    )
 
-    private def getIFToken(key: String): String =
-      servicesConfig.getString(s"microservice.services.integration-framework.authorization-token.$key")
+    private def getAPIIFToken(apiNumber: String): Option[String] =
+      getOptionalToken(s"integration-framework.authorization-token.$apiNumber")
+
+    private def getIFToken(name: String): Option[String] =
+      getOptionalToken(s"integration-framework.authorization-token.$name")
+
+    private def getOptionalToken(key: String): Option[String] =
+      Try(servicesConfig.getConfString(key, "")).toOption.filter(_.nonEmpty)
   }
 
   private val integrationFrameworkEnvironment = servicesConfig.getString(
@@ -81,13 +90,16 @@ class IfConnector @Inject()(servicesConfig: ServicesConfig, http: HttpClientV2, 
 
   private def extractCorrelationId(requestHeader: RequestHeader): String = validateCorrelationId(requestHeader).toString
 
-  private def setHeaders(requestHeader: RequestHeader, bearerToken: String): Seq[(String, String)] = Seq(
-    HeaderNames.authorisation -> s"Bearer $bearerToken",
-    "Environment"             -> integrationFrameworkEnvironment,
-    "CorrelationId"           -> extractCorrelationId(requestHeader)
-  )
+  private def setHeaders(
+    requestHeader: RequestHeader,
+    bearerToken: Option[String]
+  ): Seq[(String, String)] =
+    bearerToken.map(token => HeaderNames.authorisation -> s"Bearer $token").toSeq ++ Seq(
+      "Environment"   -> integrationFrameworkEnvironment,
+      "CorrelationId" -> extractCorrelationId(requestHeader)
+    )
 
-  private def callIF[R: Format: ClassTag](url: String, matchId: String, bearerToken: String)(implicit
+  private def callIF[R: Format: ClassTag](url: String, matchId: String, bearerToken: Option[String])(implicit
                                                                                              hc: HeaderCarrier,
                                                                                              request: RequestHeader
   ) =

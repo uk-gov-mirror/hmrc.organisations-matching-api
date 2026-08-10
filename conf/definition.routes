@@ -1,3 +1,3 @@
-GET    /api/definition                              @uk.gov.hmrc.organisationsmatchingapi.controllers.DocumentationController.definition()
-GET    /api/documentation/:version/:endpointName    @uk.gov.hmrc.organisationsmatchingapi.controllers.DocumentationController.documentation(version,endpointName)
-GET    /api/conf/:version/*file                     @uk.gov.hmrc.organisationsmatchingapi.controllers.DocumentationController.specification(version, file)
+GET    /api/definition                              @uk.gov.hmrc.organisationsmatchingapi.controllers.documentation.DocumentationController.definition()
+GET    /api/documentation/:version/:endpointName    @uk.gov.hmrc.organisationsmatchingapi.controllers.documentation.DocumentationController.documentation(version,endpointName)
+GET    /api/conf/:version/*file                     @uk.gov.hmrc.organisationsmatchingapi.controllers.documentation.DocumentationController.specification(version, file)

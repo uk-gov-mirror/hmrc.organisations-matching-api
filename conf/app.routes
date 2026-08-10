@@ -1,3 +1,3 @@
 # microservice specific routes
-GET  /match-record/:matchId       uk.gov.hmrc.organisationsmatchingapi.controllers.MatchedController.matchedOrganisation(matchId: java.lang.String)
-GET  /match-record/vat/:matchId   uk.gov.hmrc.organisationsmatchingapi.controllers.MatchedController.matchedVatRecord(matchId: java.util.UUID)
+GET  /match-record/:matchId       uk.gov.hmrc.organisationsmatchingapi.controllers.internal.MatchRecordController.matchedOrganisation(matchId: java.lang.String)
+GET  /match-record/vat/:matchId   uk.gov.hmrc.organisationsmatchingapi.controllers.internal.MatchRecordController.matchedVatRecord(matchId: java.util.UUID)

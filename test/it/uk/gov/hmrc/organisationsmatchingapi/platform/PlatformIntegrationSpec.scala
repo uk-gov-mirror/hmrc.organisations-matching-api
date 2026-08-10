@@ -34,7 +34,7 @@ import play.api.mvc.{AnyContentAsEmpty, Result}
 import play.api.test.FakeRequest
 import play.api.test.Helpers.{contentAsJson, contentAsString, defaultAwaitTimeout, status}
 import play.api.{Application, Mode}
-import uk.gov.hmrc.organisationsmatchingapi.controllers.DocumentationController
+import uk.gov.hmrc.organisationsmatchingapi.controllers.documentation.DocumentationController
 
 import scala.collection.Seq
 import scala.concurrent.Future
